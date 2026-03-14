@@ -596,6 +596,9 @@ async function fetchCriativos(){
   const {data,error}=await sb.rpc('dashboard_criativos',{p_data_inicio:dtStart.value,p_data_fim:dtEnd.value});
   if(error){tbody.innerHTML='<tr><td colspan="14" class="loading" style="color:#EF4444">Erro: '+error.message+'</td></tr>';return}
   crData=data||[];
+  console.log('RPC raw data:', JSON.stringify(data[0]));
+  console.log('Total rows:', data.length);
+  console.log('consultas field:', data[0]?.consultas, typeof data[0]?.consultas);
   crSort={col:'custo',dir:'desc'};
   renderCriativosKPIs();
   renderCriativosTable();
