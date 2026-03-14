@@ -78,6 +78,12 @@ tr.row-total:hover td{background:var(--gray-light)}
 .chart-wrap{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;overflow-x:auto}
 .chart-wrap svg{display:block}
 .chart-tooltip{position:fixed;background:var(--black);color:#fff;font-family:'JetBrains Mono',monospace;font-size:11px;padding:8px 12px;border-radius:6px;pointer-events:none;z-index:1000;display:none;line-height:1.6}
+.cr-sortable{cursor:pointer;user-select:none;position:relative}
+.cr-sortable:hover{background:var(--hover-green)}
+.cr-sortable .sort-arrow{font-size:10px;margin-left:4px;color:var(--text-secondary)}
+.cr-thumb{width:48px;height:48px;border-radius:6px;object-fit:cover;display:block}
+.cr-thumb-placeholder{width:48px;height:48px;background:#E8EDE8;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#8A9B8A;font-size:9px;text-align:center}
+.cr-name{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-family:'DM Sans',sans-serif;cursor:default}
 @media(max-width:768px){
 header{flex-direction:column;gap:12px;padding:12px 16px}
 .container{padding:16px 12px}
@@ -114,6 +120,7 @@ header{flex-direction:column;gap:12px;padding:12px 16px}
 <button class="tab active" onclick="switchTab('meta')">Meta & Projeção</button>
 <button class="tab" onclick="switchTab('relatorio')">Relatório Diário</button>
 <button class="tab" onclick="switchTab('overview')">Visão Geral</button>
+<button class="tab" onclick="switchTab('criativos')">Criativos</button>
 </div>
 <div id="tab-relatorio" class="tab-content">
 <div class="kpi-grid" id="kpi-grid"></div>
@@ -220,6 +227,31 @@ header{flex-direction:column;gap:12px;padding:12px 16px}
 </table>
 </div>
 </div><!-- /tab-meta -->
+
+<div id="tab-criativos" class="tab-content">
+<div class="kpi-grid" id="cr-kpi-grid"></div>
+<div class="table-wrap">
+<table id="cr-table">
+<thead><tr>
+<th class="col-header" style="text-align:left;width:56px">Thumb</th>
+<th class="col-header cr-sortable" style="text-align:left;max-width:300px" data-col="criativo_nome">Criativo</th>
+<th class="col-header cr-sortable" data-col="custo">Custo</th>
+<th class="col-header cr-sortable" data-col="impressoes">Impressões</th>
+<th class="col-header cr-sortable" data-col="cliques">Cliques</th>
+<th class="col-header cr-sortable" data-col="ctr">CTR</th>
+<th class="col-header cr-sortable" data-col="cpm">CPM</th>
+<th class="col-header cr-sortable" data-col="consultas">Consultas</th>
+<th class="col-header cr-sortable" data-col="custo_por_consulta">Custo/Consulta</th>
+<th class="col-header cr-sortable" data-col="compras">Compras</th>
+<th class="col-header cr-sortable" data-col="custo_por_compra">Custo/Compra</th>
+<th class="col-header cr-sortable" data-col="video_views_3s">Views 3s</th>
+<th class="col-header cr-sortable" data-col="hook_rate">Hook Rate</th>
+</tr></thead>
+<tbody id="cr-body"><tr><td colspan="13" class="loading">Carregando...</td></tr></tbody>
+</table>
+</div>
+</div><!-- /tab-criativos -->
+
 </div>
 <div class="chart-tooltip" id="chart-tooltip"></div>
 <script>
@@ -255,6 +287,7 @@ function switchTab(tab){
   if(tab==='overview') fetchOverview();
   else if(tab==='meta') fetchMeta();
   else if(tab==='relatorio') fetchData();
+  else if(tab==='criativos') fetchCriativos();
 }
 
 function initDates(){
@@ -284,6 +317,7 @@ function setPreset(p){
 function refreshTab(){
   if(activeTab==='overview') fetchOverview();
   else if(activeTab==='meta') fetchMeta();
+  else if(activeTab==='criativos') fetchCriativos();
   else fetchData();
 }
 
@@ -547,6 +581,131 @@ async function fetchMeta(){
       <span>R$ 0</span>
       <span>Meta: ${fmtBRL(metaTotal)}</span>
     </div>`;
+}
+
+// === Criativos tab ===
+let crData=[];
+let crSort={col:'custo',dir:'desc'};
+
+function fmtPct(v){if(v==null)return null;const n=parseFloat(v);if(isNaN(n))return null;return n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'}
+
+async function fetchCriativos(){
+  const tbody=document.getElementById('cr-body');
+  tbody.innerHTML='<tr><td colspan="13" class="loading">Carregando...</td></tr>';
+  const {data,error}=await sb.rpc('dashboard_criativos',{p_data_inicio:dtStart.value,p_data_fim:dtEnd.value});
+  if(error){tbody.innerHTML='<tr><td colspan="13" class="loading" style="color:#EF4444">Erro: '+error.message+'</td></tr>';return}
+  crData=data||[];
+  crSort={col:'custo',dir:'desc'};
+  renderCriativosKPIs();
+  renderCriativosTable();
+  bindCrSort();
+}
+
+function renderCriativosKPIs(){
+  const d=crData;
+  const totCusto=d.reduce((s,r)=>s+parseFloat(r.custo||0),0);
+  const totImp=d.reduce((s,r)=>s+(r.impressoes||0),0);
+  const totCliques=d.reduce((s,r)=>s+(r.cliques||0),0);
+  const totConsultas=d.reduce((s,r)=>s+(r.consultas||0),0);
+  const totCompras=d.reduce((s,r)=>s+(r.compras||0),0);
+  const cpmMedio=totImp?totCusto/totImp*1000:0;
+  const ctrMedio=totImp?totCliques/totImp*100:0;
+  const custoConsulta=totConsultas?totCusto/totConsultas:0;
+  const custoCompra=totCompras?totCusto/totCompras:0;
+  document.getElementById('cr-kpi-grid').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Custo Total</div><div class="kpi-value mono">${fmtBRL(totCusto)}</div><div class="kpi-sub">${d.length} criativos ativos</div></div>
+    <div class="kpi-card"><div class="kpi-label">Impressões</div><div class="kpi-value mono">${fmtInt(totImp)}</div><div class="kpi-sub">CPM médio: ${fmtBRL(cpmMedio)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-value mono">${fmtInt(totConsultas)}</div><div class="kpi-sub">Custo médio: ${totConsultas?fmtBRL(custoConsulta):'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Compras</div><div class="kpi-value mono">${fmtInt(totCompras)}</div><div class="kpi-sub">Custo médio: ${totCompras?fmtBRL(custoCompra):'—'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">CTR Médio</div><div class="kpi-value mono">${fmtPct(ctrMedio)}</div><div class="kpi-sub">${fmtInt(totCliques)} cliques totais</div></div>`;
+}
+
+function crColorCTR(v){const n=parseFloat(v);if(isNaN(n))return'';return n>=1.5?'pct-green':n>=1.0?'pct-yellow':'pct-red'}
+function crColorCPC(v){const n=parseFloat(v);if(isNaN(n))return'';return n<=150?'pct-green':n<=300?'pct-yellow':'pct-red'}
+function crColorHook(v){const n=parseFloat(v);if(isNaN(n))return'';return n>=50?'pct-green':n>=25?'pct-yellow':'pct-red'}
+function crCell(val,fmt){if(val==null||val===''||isNaN(parseFloat(val)))return'<span class="null-val">—</span>';return fmt(val)}
+function crCellInt(val){if(val==null||val===0)return'0';return fmtInt(val)}
+function crCellIntGreen(val){const n=parseInt(val)||0;return n>0?`<span class="green-val">${fmtInt(n)}</span>`:'0'}
+
+function renderCriativosTable(){
+  const sorted=[...crData].sort((a,b)=>{
+    let va=a[crSort.col],vb=b[crSort.col];
+    if(crSort.col==='criativo_nome'){
+      va=(va||'').toLowerCase();vb=(vb||'').toLowerCase();
+      return crSort.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+    }
+    va=parseFloat(va)||0;vb=parseFloat(vb)||0;
+    return crSort.dir==='asc'?va-vb:vb-va;
+  });
+  // Update sort arrows
+  document.querySelectorAll('.cr-sortable .sort-arrow').forEach(el=>el.remove());
+  document.querySelectorAll('.cr-sortable').forEach(th=>{
+    if(th.dataset.col===crSort.col){
+      th.insertAdjacentHTML('beforeend',`<span class="sort-arrow">${crSort.dir==='asc'?'▲':'▼'}</span>`);
+    }
+  });
+  let html='';
+  for(const r of sorted){
+    const thumbUrl=r.thumbnail_url;
+    const thumbHtml=thumbUrl?
+      `<img src="${thumbUrl}" class="cr-thumb" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="cr-thumb-placeholder" style="display:none">SEM IMG</div>`:
+      `<div class="cr-thumb-placeholder">SEM IMG</div>`;
+    html+=`<tr>
+      <td style="text-align:center;padding:4px 6px">${thumbHtml}</td>
+      <td style="text-align:left"><div class="cr-name" title="${(r.criativo_nome||'').replace(/"/g,'&quot;')}">${r.criativo_nome||'—'}</div></td>
+      <td>${crCell(r.custo,fmtBRL)}</td>
+      <td>${crCellInt(r.impressoes)}</td>
+      <td>${crCellInt(r.cliques)}</td>
+      <td><span class="${crColorCTR(r.ctr)}">${crCell(r.ctr,fmtPct)}</span></td>
+      <td>${crCell(r.cpm,fmtBRL)}</td>
+      <td>${crCellIntGreen(r.consultas)}</td>
+      <td><span class="${crColorCPC(r.custo_por_consulta)}">${crCell(r.custo_por_consulta,fmtBRL)}</span></td>
+      <td>${crCellIntGreen(r.compras)}</td>
+      <td>${crCell(r.custo_por_compra,fmtBRL)}</td>
+      <td>${crCellInt(r.video_views_3s)}</td>
+      <td><span class="${crColorHook(r.hook_rate)}">${crCell(r.hook_rate,fmtPct)}</span></td>
+    </tr>`;
+  }
+  // Total row
+  const d=crData;
+  const tCusto=d.reduce((s,r)=>s+parseFloat(r.custo||0),0);
+  const tImp=d.reduce((s,r)=>s+(r.impressoes||0),0);
+  const tCli=d.reduce((s,r)=>s+(r.cliques||0),0);
+  const tCon=d.reduce((s,r)=>s+(r.consultas||0),0);
+  const tCom=d.reduce((s,r)=>s+(r.compras||0),0);
+  const tV3=d.reduce((s,r)=>s+(r.video_views_3s||0),0);
+  const tCtr=tImp?tCli/tImp*100:0;
+  const tCpm=tImp?tCusto/tImp*1000:0;
+  const tCPC=tCon?tCusto/tCon:0;
+  const tCPCo=tCom?tCusto/tCom:0;
+  const tHook=tImp?d.reduce((s,r)=>s+(r.video_views_3s||0),0)/tImp*100:0;
+  html+=`<tr class="row-total">
+    <td></td>
+    <td style="text-align:left;font-family:'DM Sans',sans-serif">Total (${d.length} criativos)</td>
+    <td>${fmtBRL(tCusto)}</td>
+    <td>${fmtInt(tImp)}</td>
+    <td>${fmtInt(tCli)}</td>
+    <td>${fmtPct(tCtr)}</td>
+    <td>${fmtBRL(tCpm)}</td>
+    <td>${fmtInt(tCon)}</td>
+    <td>${tCon?fmtBRL(tCPC):'<span class="null-val">—</span>'}</td>
+    <td>${fmtInt(tCom)}</td>
+    <td>${tCom?fmtBRL(tCPCo):'<span class="null-val">—</span>'}</td>
+    <td>${fmtInt(tV3)}</td>
+    <td>${tImp?fmtPct(tHook):'<span class="null-val">—</span>'}</td>
+  </tr>`;
+  document.getElementById('cr-body').innerHTML=html;
+}
+
+function bindCrSort(){
+  document.querySelectorAll('.cr-sortable').forEach(th=>{
+    th.onclick=()=>{
+      const col=th.dataset.col;
+      if(crSort.col===col) crSort.dir=crSort.dir==='asc'?'desc':'asc';
+      else{crSort.col=col;crSort.dir='desc'}
+      renderCriativosTable();
+    };
+  });
 }
 
 initDates();
