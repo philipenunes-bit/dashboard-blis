@@ -48,6 +48,36 @@ tr.row-total:hover td{background:var(--gray-light)}
 .loading{text-align:center;padding:60px;color:var(--text-secondary);font-size:14px}
 .weekend td{background:#FAFAFA}
 .weekend:hover td{background:var(--hover-green)}
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px}
+.tab{padding:12px 24px;font-size:14px;font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;background:none;border-top:none;border-left:none;border-right:none;font-family:'DM Sans',sans-serif}
+.tab.active{color:var(--text);border-bottom-color:var(--green)}
+.tab:hover{color:var(--text)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.green-val{color:var(--green-dark);font-weight:600}
+.pct-val{font-weight:500}
+.safra-strip{background:var(--gray-light);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.safra-strip .kpi-label{margin-bottom:4px}
+.section-title{font-size:14px;font-weight:600;color:var(--text);margin:24px 0 12px}
+.meta-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.meta-filters select{font-family:'DM Sans',sans-serif;padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text);background:var(--card-bg);cursor:pointer}
+.delta-pos{color:var(--green-dark);font-weight:600}
+.delta-neg{color:#DC3545;font-weight:600}
+.pct-green{color:var(--green-dark);font-weight:600}
+.pct-yellow{color:#F59E0B;font-weight:600}
+.pct-red{color:#DC3545;font-weight:600}
+.row-today td{border-left:4px solid var(--green)!important}
+.row-future td{background:#FAFBFC}
+.row-future:hover td{background:#F3F4F6}
+.progress-wrap{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:24px;margin-top:24px}
+.progress-bar-outer{position:relative;height:48px;background:var(--gray-light);border-radius:8px;overflow:visible;margin-top:12px}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--green-dark));border-radius:8px 0 0 8px;display:flex;align-items:center;padding:0 16px;transition:width .5s;min-width:0}
+.progress-bar-fill span{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;white-space:nowrap}
+.progress-marker{position:absolute;top:-6px;bottom:-6px;width:3px;background:var(--black);border-radius:2px;z-index:2}
+.progress-marker::after{content:attr(data-label);position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);white-space:nowrap}
+.chart-wrap{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px;overflow-x:auto}
+.chart-wrap svg{display:block}
+.chart-tooltip{position:fixed;background:var(--black);color:#fff;font-family:'JetBrains Mono',monospace;font-size:11px;padding:8px 12px;border-radius:6px;pointer-events:none;z-index:1000;display:none;line-height:1.6}
 @media(max-width:768px){
 header{flex-direction:column;gap:12px;padding:12px 16px}
 .container{padding:16px 12px}
@@ -71,10 +101,21 @@ header{flex-direction:column;gap:12px;padding:12px 16px}
 <button class="preset-btn" onclick="setPreset(15)">15 dias</button>
 <button class="preset-btn active" onclick="setPreset('mes')">Mês atual</button>
 <button class="preset-btn" onclick="setPreset('ano')">2026</button>
-<button class="btn-update" onclick="fetchData()">Atualizar</button>
+<button class="btn-update" onclick="refreshTab()">Atualizar</button>
+<div class="meta-filters" id="meta-filters" style="display:none">
+<label>Mês</label>
+<select id="meta-mes"><option value="2026-03-01">Março 2026</option></select>
+<button class="btn-update" onclick="fetchMeta()">Atualizar</button>
+</div>
 </div>
 </header>
 <div class="container">
+<div class="tabs">
+<button class="tab active" onclick="switchTab('meta')">Meta & Projeção</button>
+<button class="tab" onclick="switchTab('relatorio')">Relatório Diário</button>
+<button class="tab" onclick="switchTab('overview')">Visão Geral</button>
+</div>
+<div id="tab-relatorio" class="tab-content">
 <div class="kpi-grid" id="kpi-grid"></div>
 <div class="table-wrap">
 <table id="main-table">
@@ -114,7 +155,73 @@ header{flex-direction:column;gap:12px;padding:12px 16px}
 </tbody>
 </table>
 </div>
+</div><!-- /tab-relatorio -->
+<div id="tab-overview" class="tab-content">
+<div class="kpi-grid" id="ov-kpi-grid"></div>
+<div class="section-title">Resumo dia a dia</div>
+<div class="table-wrap">
+<table><thead><tr>
+<th class="col-header" style="text-align:left">Data</th>
+<th class="col-header">Investimento</th>
+<th class="col-header">Consultas</th>
+<th class="col-header">Custo/Consulta</th>
+<th class="col-header">Pedidos</th>
+<th class="col-header">CAC</th>
+<th class="col-header">Faturamento Total</th>
+<th class="col-header">ROAS</th>
+<th class="col-header">% Invest/Fat</th>
+</tr></thead>
+<tbody id="ov-table-body"><tr><td colspan="9" class="loading">Carregando...</td></tr></tbody>
+</table>
 </div>
+<div class="section-title">Composição do Faturamento</div>
+<div class="table-wrap">
+<table><thead><tr>
+<th class="col-header" style="text-align:left">Data</th>
+<th class="col-header">Recompra</th>
+<th class="col-header">% Recompra</th>
+<th class="col-header">Dia pro dia</th>
+<th class="col-header">% Dia pro dia</th>
+<th class="col-header">Logins anteriores</th>
+<th class="col-header">% Logins ant.</th>
+</tr></thead>
+<tbody id="ov-comp-body"><tr><td colspan="7" class="loading">Carregando...</td></tr></tbody>
+</table>
+</div>
+<div class="safra-strip" id="ov-safra-strip"></div>
+</div><!-- /tab-overview -->
+<div id="tab-meta" class="tab-content active">
+<div class="kpi-grid" id="mt-kpi-grid"></div>
+<div class="chart-wrap" id="mt-chart"></div>
+<div class="section-title">Diarizado</div>
+<div class="table-wrap">
+<table><thead><tr>
+<th class="col-header" style="text-align:left">Dia</th>
+<th class="col-header" style="text-align:left">Dia da Semana</th>
+<th class="col-header" style="text-align:left">Semana</th>
+<th class="col-header">Fat. Projetado</th>
+<th class="col-header">Fat. Realizado</th>
+<th class="col-header">Delta</th>
+</tr></thead>
+<tbody id="mt-diar-body"><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
+</table>
+</div>
+<div class="section-title">Acumulado</div>
+<div class="table-wrap">
+<table><thead><tr>
+<th class="col-header" style="text-align:left">Dia</th>
+<th class="col-header">Fat. Projetado Acum.</th>
+<th class="col-header">Fat. Realizado Acum.</th>
+<th class="col-header">Delta Acum.</th>
+<th class="col-header">% Atingimento</th>
+</tr></thead>
+<tbody id="mt-acum-body"><tr><td colspan="5" class="loading">Carregando...</td></tr></tbody>
+</table>
+</div>
+<div class="progress-wrap" id="mt-progress"></div>
+</div><!-- /tab-meta -->
+</div>
+<div class="chart-tooltip" id="chart-tooltip"></div>
 <script>
 const SUPABASE_URL='https://ovlzkdzcdtzsffkxzfko.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92bHprZHpjZHR6c2Zma3h6ZmtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5MjkzOTEsImV4cCI6MjA4ODUwNTM5MX0.FHIPs-tD1PPRYZiutHaFkj0kWTKOLGSh13TcQo9SHSE';
@@ -131,6 +238,23 @@ function fmtDate(d){const p=d.split('-');const dt=new Date(d+'T12:00:00');const 
 function cell(v,fmt){if(v==null||v===undefined||(typeof v==='string'&&v.trim()==='')){return'<td><span class="null-val">—</span></td>'}if(fmt==='brl')return'<td>'+fmtBRL(v)+'</td>';if(fmt==='dec')return'<td>'+fmtDec(v)+'</td>';if(fmt==='int')return'<td>'+fmtInt(v)+'</td>';return'<td>'+v+'</td>'}
 function sum(arr,k){return arr.reduce((a,r)=>a+(parseFloat(r[k])||0),0)}
 function safeDiv(a,b){return b?a/b:0}
+
+let activeTab='meta';
+const dateFilters=document.querySelector('.filters');
+const metaFilters=document.getElementById('meta-filters');
+function switchTab(tab){
+  activeTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelector(`.tab-content#tab-${tab}`).classList.add('active');
+  event.target.classList.add('active');
+  // Toggle filters
+  const isMetaTab=tab==='meta';
+  dateFilters.querySelectorAll('label,input,.preset-btn,.btn-update').forEach(el=>{el.style.display=isMetaTab?'none':''});
+  metaFilters.style.display=isMetaTab?'flex':'none';
+  if(tab==='overview') fetchOverview();
+  else if(tab==='meta') fetchMeta();
+}
 
 function initDates(){
   const today=new Date();
@@ -153,7 +277,13 @@ function setPreset(p){
   }else if(p==='ano'){
     dtStart.value='2026-01-01';dtEnd.value=iso(today);
   }
-  fetchData();
+  refreshTab();
+}
+
+function refreshTab(){
+  if(activeTab==='overview') fetchOverview();
+  else if(activeTab==='meta') fetchMeta();
+  else fetchData();
 }
 
 async function fetchData(){
@@ -233,8 +363,196 @@ async function fetchData(){
   tbody.innerHTML=html;
 }
 
+async function fetchOverview(){
+  const tb1=document.getElementById('ov-table-body');
+  const tb2=document.getElementById('ov-comp-body');
+  tb1.innerHTML='<tr><td colspan="9" class="loading">Carregando...</td></tr>';
+  tb2.innerHTML='<tr><td colspan="7" class="loading">Carregando...</td></tr>';
+  const{data,error}=await sb.rpc('dashboard_overview',{p_data_inicio:dtStart.value,p_data_fim:dtEnd.value});
+  if(error){tb1.innerHTML='<tr><td colspan="9" class="loading" style="color:#EF4444">Erro: '+error.message+'</td></tr>';return}
+  if(!data||!data.length){tb1.innerHTML='<tr><td colspan="9" class="loading">Nenhum dado</td></tr>';tb2.innerHTML='';document.getElementById('ov-kpi-grid').innerHTML='';document.getElementById('ov-safra-strip').innerHTML='';return}
+  data.sort((a,b)=>b.data.localeCompare(a.data));
+
+  // KPIs
+  const sInv=sum(data,'investimento_total'),sFat=sum(data,'faturamento_total'),sCons=sum(data,'consultas'),sPed=sum(data,'pedidos_dia_pro_dia'),sOrdS=sum(data,'orders_safra'),sFatS=sum(data,'faturamento_safra');
+  const roasT=safeDiv(sFat,sInv),pctInvFat=safeDiv(sInv,sFat)*100,custoConsT=safeDiv(sInv,sCons),cacT=safeDiv(sInv,sPed),roasSafraT=safeDiv(sFatS,sInv),roiSafraT=roasSafraT*0.46;
+
+  document.getElementById('ov-kpi-grid').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Investimento Total</div><div class="kpi-value">${fmtBRL(sInv)}</div><div class="kpi-sub">com 12% de impostos</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faturamento Total</div><div class="kpi-value green-val">${fmtBRL(sFat)}</div><div class="kpi-sub">ROAS: ${fmtDec(roasT)}x</div></div>
+    <div class="kpi-card"><div class="kpi-label">% Invest. vs Faturamento</div><div class="kpi-value">${fmtDec(pctInvFat)}%</div><div class="kpi-sub">do faturamento é investido em Ads</div></div>
+    <div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-value mono">${fmtInt(sCons)}</div><div class="kpi-sub">Custo/Consulta: ${fmtBRL(custoConsT)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Pedidos (dia pro dia)</div><div class="kpi-value mono">${fmtInt(sPed)}</div><div class="kpi-sub">CAC: ${fmtBRL(cacT)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">ROI Safra (período)</div><div class="kpi-value">${fmtDec(roiSafraT)}</div><div class="kpi-sub">Margem 46% sobre ROAS Safra</div></div>`;
+
+  // Table 1 - resumo
+  let h1='';
+  for(const r of data){
+    const dt=new Date(r.data+'T12:00:00');const wd=dt.getDay();const cls=(wd===0||wd===6)?'class="weekend"':'';
+    h1+=`<tr ${cls}><td style="text-align:left">${fmtDate(r.data)}</td>${cell(r.investimento_total,'brl')}${cell(r.consultas,'int')}${cell(r.custo_por_consulta,'brl')}${cell(r.pedidos_dia_pro_dia,'int')}${cell(r.cac,'brl')}<td class="green-val">${fmtBRL(r.faturamento_total)}</td>${cell(r.roas,'dec')}<td>${fmtDec(r.pct_investimento_vs_faturamento)}%</td></tr>`;
+  }
+  h1+=`<tr class="row-total"><td style="text-align:left;font-weight:700">Soma</td><td>${fmtBRL(sInv)}</td><td>${fmtInt(sCons)}</td><td>${fmtBRL(custoConsT)}</td><td>${fmtInt(sPed)}</td><td>${fmtBRL(cacT)}</td><td class="green-val">${fmtBRL(sFat)}</td><td>${fmtDec(roasT)}</td><td>${fmtDec(pctInvFat)}%</td></tr>`;
+  tb1.innerHTML=h1;
+
+  // Table 2 - composicao
+  let h2='';
+  const sRec=sum(data,'fat_recompra'),sDpd=sum(data,'fat_dia_pro_dia'),sLog=sum(data,'fat_logins_anteriores'),sTotComp=sRec+sDpd+sLog;
+  for(const r of data){
+    const dt=new Date(r.data+'T12:00:00');const wd=dt.getDay();const cls=(wd===0||wd===6)?'class="weekend"':'';
+    h2+=`<tr ${cls}><td style="text-align:left">${fmtDate(r.data)}</td>${cell(r.fat_recompra,'brl')}<td>${fmtDec(r.pct_recompra)}%</td>${cell(r.fat_dia_pro_dia,'brl')}<td>${fmtDec(r.pct_dia_pro_dia)}%</td>${cell(r.fat_logins_anteriores,'brl')}<td>${fmtDec(r.pct_logins_anteriores)}%</td></tr>`;
+  }
+  h2+=`<tr class="row-total"><td style="text-align:left;font-weight:700">Soma</td><td>${fmtBRL(sRec)}</td><td>${fmtDec(sTotComp?sRec/sTotComp*100:0)}%</td><td>${fmtBRL(sDpd)}</td><td>${fmtDec(sTotComp?sDpd/sTotComp*100:0)}%</td><td>${fmtBRL(sLog)}</td><td>${fmtDec(sTotComp?sLog/sTotComp*100:0)}%</td></tr>`;
+  tb2.innerHTML=h2;
+
+  // Safra strip
+  document.getElementById('ov-safra-strip').innerHTML=`
+    <div><div class="kpi-label">Orders Safra</div><div class="kpi-value mono">${fmtInt(sOrdS)}</div></div>
+    <div><div class="kpi-label">Faturamento Safra</div><div class="kpi-value">${fmtBRL(sFatS)}</div></div>
+    <div><div class="kpi-label">ROAS Safra</div><div class="kpi-value">${fmtDec(roasSafraT)}</div></div>
+    <div><div class="kpi-label">ROI Safra</div><div class="kpi-value">${fmtDec(roiSafraT)}</div></div>`;
+}
+
+function fmtDelta(v){
+  const n=parseFloat(v);if(isNaN(n))return{html:'<span class="null-val">—</span>',cls:''};
+  const cls=n>=0?'delta-pos':'delta-neg';
+  const prefix=n>=0?'+':'';
+  return{html:`<span class="${cls}">${prefix}${fmtBRL(n)}</span>`,cls};
+}
+function pctClass(v){const n=parseFloat(v);if(n>=100)return'pct-green';if(n>=85)return'pct-yellow';return'pct-red'}
+function fmtDD(d){return d.split('-')[2]+'/'+d.split('-')[1]}
+
+async function fetchMeta(){
+  const mes=document.getElementById('meta-mes').value;
+  const tb1=document.getElementById('mt-diar-body');
+  const tb2=document.getElementById('mt-acum-body');
+  tb1.innerHTML='<tr><td colspan="6" class="loading">Carregando...</td></tr>';
+  tb2.innerHTML='<tr><td colspan="5" class="loading">Carregando...</td></tr>';
+  const{data,error}=await sb.rpc('dashboard_meta',{p_mes:mes});
+  if(error){tb1.innerHTML='<tr><td colspan="6" class="loading" style="color:#EF4444">Erro: '+error.message+'</td></tr>';return}
+  if(!data||!data.length){tb1.innerHTML='<tr><td colspan="6" class="loading">Nenhum dado</td></tr>';return}
+
+  // D-1: exclude today from "realized" calculations
+  const hoje=new Date().toISOString().slice(0,10);
+  const withReal=data.filter(r=>parseFloat(r.fat_realizado)>0&&r.dia<hoje);
+  const lastReal=withReal.length?withReal[withReal.length-1]:null;
+  const metaTotal=sum(data,'fat_projetado');
+  const realTotal=lastReal?parseFloat(lastReal.fat_realizado_acum):0;
+  const pctAtual=lastReal?parseFloat(lastReal.pct_atingimento):0;
+  const deltaAcum=lastReal?parseFloat(lastReal.delta_acum):0;
+  // Projeção = (pctAtual / 100) * metaTotal projetado para o mês cheio
+  // Se estamos em X% do projetado acum, projeção = realTotal / (projAcumD1 / metaTotal)
+  const projAcumD1=lastReal?parseFloat(lastReal.fat_projetado_acum):0;
+  const projecao=projAcumD1?realTotal/projAcumD1*metaTotal:0;
+  const ritmo=withReal.length?realTotal/withReal.length:0;
+
+  // KPIs
+  const deltaD=fmtDelta(deltaAcum);
+  const projColor=projecao>=metaTotal?'green-val':'delta-neg';
+  const mesLabel=mes==='2026-03-01'?'Março 2026':mes;
+  document.getElementById('mt-kpi-grid').innerHTML=`
+    <div class="kpi-card"><div class="kpi-label">Meta do Mês</div><div class="kpi-value">${fmtBRL(metaTotal)}</div><div class="kpi-sub">${mesLabel}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Realizado (D-1)</div><div class="kpi-value green-val">${fmtBRL(realTotal)}</div><div class="kpi-sub">${fmtDec(pctAtual)}% da meta</div></div>
+    <div class="kpi-card"><div class="kpi-label">Delta Acumulado</div><div class="kpi-value">${deltaD.html}</div><div class="kpi-sub">${deltaAcum>=0?'à frente da meta':'atrás da meta'}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Projeção de Fechamento</div><div class="kpi-value ${projColor}">${fmtBRL(projecao)}</div><div class="kpi-sub">${fmtDec(pctAtual)}% do projetado × meta</div></div>`;
+
+  // SVG Chart - improved
+  const cH=280,padL=80,padR=20,padT=30,padB=50,bW=14,gap=3,groupGap=10;
+  const maxVal=Math.max(...data.map(r=>Math.max(parseFloat(r.fat_projetado)||0,parseFloat(r.fat_realizado)||0)))*1.1;
+  const chartH=cH-padT-padB;
+  const scale=v=>chartH*(v/maxVal);
+  const svgW=padL+data.length*(bW*2+gap+groupGap)+padR;
+  const y0=cH-padB;
+  let svg='';
+  // Y axis grid lines
+  const ySteps=5;
+  for(let i=0;i<=ySteps;i++){
+    const val=maxVal/ySteps*i;
+    const y=y0-scale(val);
+    svg+=`<line x1="${padL}" y1="${y}" x2="${svgW-padR}" y2="${y}" stroke="#E5E7EB" stroke-width="1"/>`;
+    svg+=`<text x="${padL-8}" y="${y+4}" text-anchor="end" font-size="9" fill="#6B7280" font-family="JetBrains Mono">${val>=1000000?(val/1000000).toFixed(1)+'M':val>=1000?(val/1000).toFixed(0)+'K':val.toFixed(0)}</text>`;
+  }
+  // Baseline
+  svg+=`<line x1="${padL}" y1="${y0}" x2="${svgW-padR}" y2="${y0}" stroke="#D1D5DB" stroke-width="1"/>`;
+  const tooltip=document.getElementById('chart-tooltip');
+  data.forEach((r,i)=>{
+    const x=padL+i*(bW*2+gap+groupGap);
+    const fp=parseFloat(r.fat_projetado)||0;
+    const fr=parseFloat(r.fat_realizado)||0;
+    const isFut=r.dia>=hoje;
+    const hp=scale(fp),hr=scale(fr);
+    svg+=`<rect x="${x}" y="${y0-hp}" width="${bW}" height="${hp}" fill="#D1D5DB" rx="3" data-p="${fmtBRL(fp)}" data-r="${fr>0&&!isFut?fmtBRL(fr):'—'}" data-d="${fmtDD(r.dia)}" class="chart-bar"/>`;
+    if(fr>0&&!isFut) svg+=`<rect x="${x+bW+gap}" y="${y0-hr}" width="${bW}" height="${hr}" fill="#34C759" rx="3" data-p="${fmtBRL(fp)}" data-r="${fmtBRL(fr)}" data-d="${fmtDD(r.dia)}" class="chart-bar"/>`;
+    svg+=`<text x="${x+bW+gap/2}" y="${y0+16}" text-anchor="middle" font-size="9" fill="#6B7280" font-family="JetBrains Mono">${r.dia.split('-')[2]}</text>`;
+  });
+  // Legend
+  svg+=`<rect x="${padL}" y="6" width="12" height="12" fill="#D1D5DB" rx="2"/><text x="${padL+16}" y="16" font-size="11" fill="#6B7280" font-family="DM Sans">Projetado</text>`;
+  svg+=`<rect x="${padL+90}" y="6" width="12" height="12" fill="#34C759" rx="2"/><text x="${padL+106}" y="16" font-size="11" fill="#6B7280" font-family="DM Sans">Realizado</text>`;
+  document.getElementById('mt-chart').innerHTML=`<svg width="${svgW}" height="${cH}" viewBox="0 0 ${svgW} ${cH}">${svg}</svg>`;
+  document.querySelectorAll('.chart-bar').forEach(el=>{
+    el.addEventListener('mouseenter',e=>{
+      tooltip.style.display='block';
+      tooltip.innerHTML=`<b>${el.dataset.d}</b><br>Projetado: ${el.dataset.p}<br>Realizado: ${el.dataset.r}`;
+    });
+    el.addEventListener('mousemove',e=>{tooltip.style.left=e.clientX+12+'px';tooltip.style.top=e.clientY-10+'px'});
+    el.addEventListener('mouseleave',()=>{tooltip.style.display='none'});
+  });
+
+  // Diarizado table
+  let h1='',lastSemana='';
+  data.forEach(r=>{
+    const fr=parseFloat(r.fat_realizado)||0;
+    const isFuture=r.dia>=hoje;
+    const isToday=lastReal&&r.dia===lastReal.dia;
+    let cls=isToday?'row-today':isFuture?'row-future':'';
+    const sem=r.semana!==lastSemana?r.semana:'';
+    if(r.semana!==lastSemana) lastSemana=r.semana;
+    const delta=isFuture?'<td><span class="null-val">—</span></td>':`<td>${fmtDelta(r.delta_dia).html}</td>`;
+    const realCell=isFuture?'<td><span class="null-val">—</span></td>':`<td>${fmtBRL(fr)}</td>`;
+    h1+=`<tr class="${cls}"><td style="text-align:left">${fmtDD(r.dia)}</td><td style="text-align:left">${r.dia_semana}</td><td style="text-align:left">${sem}</td><td>${fmtBRL(r.fat_projetado)}</td>${realCell}${delta}</tr>`;
+  });
+  tb1.innerHTML=h1;
+
+  // Acumulado table
+  let h2='';
+  data.forEach(r=>{
+    const fr=parseFloat(r.fat_realizado)||0;
+    const isFuture=r.dia>=hoje;
+    const isToday=lastReal&&r.dia===lastReal.dia;
+    let cls=isToday?'row-today':isFuture?'row-future':'';
+    const realAcum=isFuture?'<td><span class="null-val">—</span></td>':`<td>${fmtBRL(r.fat_realizado_acum)}</td>`;
+    const deltaAc=isFuture?'<td><span class="null-val">—</span></td>':`<td>${fmtDelta(r.delta_acum).html}</td>`;
+    const pctAt=isFuture?'<td><span class="null-val">—</span></td>':`<td class="${pctClass(r.pct_atingimento)}">${fmtDec(r.pct_atingimento)}%</td>`;
+    h2+=`<tr class="${cls}"><td style="text-align:left">${fmtDD(r.dia)}</td><td>${fmtBRL(r.fat_projetado_acum)}</td>${realAcum}${deltaAc}${pctAt}</tr>`;
+  });
+  tb2.innerHTML=h2;
+
+  // Progress bar
+  const pctRealVsMeta=metaTotal?realTotal/metaTotal*100:0;
+  const pctFill=Math.min(pctRealVsMeta,100);
+  const pctEsperado=metaTotal?projAcumD1/metaTotal*100:0;
+  const diff=pctRealVsMeta-pctEsperado;
+  const diffLabel=diff>=0?`+${fmtDec(diff)}% à frente`:`${fmtDec(diff)}% atrás`;
+  const diffColor=diff>=0?'delta-pos':'delta-neg';
+  document.getElementById('mt-progress').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <div class="kpi-label" style="margin:0">Progresso da Meta — ${mesLabel}</div>
+      <div style="font-size:12px"><span class="${diffColor}">${diffLabel}</span> do esperado</div>
+    </div>
+    <div class="progress-bar-outer">
+      <div class="progress-bar-fill" style="width:${pctFill}%"><span>${fmtDec(pctRealVsMeta)}% — ${fmtBRL(realTotal)}</span></div>
+      <div class="progress-marker" style="left:${Math.min(pctEsperado,100)}%" data-label="Deveria estar: ${fmtDec(pctEsperado)}% (${fmtBRL(projAcumD1)})"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-secondary);font-family:JetBrains Mono">
+      <span>R$ 0</span>
+      <span>Meta: ${fmtBRL(metaTotal)}</span>
+    </div>`;
+}
+
 initDates();
-fetchData();
+// Hide date filters on init (meta tab is default)
+dateFilters.querySelectorAll('label,input,.preset-btn,.btn-update').forEach(el=>{el.style.display='none'});
+metaFilters.style.display='flex';
+fetchMeta();
 </script>
 </body>
 </html>
