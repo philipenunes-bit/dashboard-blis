@@ -246,8 +246,9 @@ header{flex-direction:column;gap:12px;padding:12px 16px}
 <th class="col-header cr-sortable" data-col="custo_por_compra">Custo/Compra</th>
 <th class="col-header cr-sortable" data-col="video_views_3s">Views 3s</th>
 <th class="col-header cr-sortable" data-col="hook_rate">Hook Rate</th>
+<th class="col-header cr-sortable" data-col="dias_ativo">Dias Ativo</th>
 </tr></thead>
-<tbody id="cr-body"><tr><td colspan="13" class="loading">Carregando...</td></tr></tbody>
+<tbody id="cr-body"><tr><td colspan="14" class="loading">Carregando...</td></tr></tbody>
 </table>
 </div>
 </div><!-- /tab-criativos -->
@@ -591,9 +592,9 @@ function fmtPct(v){if(v==null)return null;const n=parseFloat(v);if(isNaN(n))retu
 
 async function fetchCriativos(){
   const tbody=document.getElementById('cr-body');
-  tbody.innerHTML='<tr><td colspan="13" class="loading">Carregando...</td></tr>';
+  tbody.innerHTML='<tr><td colspan="14" class="loading">Carregando...</td></tr>';
   const {data,error}=await sb.rpc('dashboard_criativos',{p_data_inicio:dtStart.value,p_data_fim:dtEnd.value});
-  if(error){tbody.innerHTML='<tr><td colspan="13" class="loading" style="color:#EF4444">Erro: '+error.message+'</td></tr>';return}
+  if(error){tbody.innerHTML='<tr><td colspan="14" class="loading" style="color:#EF4444">Erro: '+error.message+'</td></tr>';return}
   crData=data||[];
   crSort={col:'custo',dir:'desc'};
   renderCriativosKPIs();
@@ -604,10 +605,10 @@ async function fetchCriativos(){
 function renderCriativosKPIs(){
   const d=crData;
   const totCusto=d.reduce((s,r)=>s+parseFloat(r.custo||0),0);
-  const totImp=d.reduce((s,r)=>s+(r.impressoes||0),0);
-  const totCliques=d.reduce((s,r)=>s+(r.cliques||0),0);
-  const totConsultas=d.reduce((s,r)=>s+(r.consultas||0),0);
-  const totCompras=d.reduce((s,r)=>s+(r.compras||0),0);
+  const totImp=d.reduce((s,r)=>s+parseInt(r.impressoes||0),0);
+  const totCliques=d.reduce((s,r)=>s+parseInt(r.cliques||0),0);
+  const totConsultas=d.reduce((s,r)=>s+parseInt(r.consultas||0),0);
+  const totCompras=d.reduce((s,r)=>s+parseInt(r.compras||0),0);
   const cpmMedio=totImp?totCusto/totImp*1000:0;
   const ctrMedio=totImp?totCliques/totImp*100:0;
   const custoConsulta=totConsultas?totCusto/totConsultas:0;
@@ -664,21 +665,22 @@ function renderCriativosTable(){
       <td>${crCell(r.custo_por_compra,fmtBRL)}</td>
       <td>${crCellInt(r.video_views_3s)}</td>
       <td><span class="${crColorHook(r.hook_rate)}">${crCell(r.hook_rate,fmtPct)}</span></td>
+      <td>${crCellInt(r.dias_ativo)}</td>
     </tr>`;
   }
   // Total row
   const d=crData;
   const tCusto=d.reduce((s,r)=>s+parseFloat(r.custo||0),0);
-  const tImp=d.reduce((s,r)=>s+(r.impressoes||0),0);
-  const tCli=d.reduce((s,r)=>s+(r.cliques||0),0);
-  const tCon=d.reduce((s,r)=>s+(r.consultas||0),0);
-  const tCom=d.reduce((s,r)=>s+(r.compras||0),0);
-  const tV3=d.reduce((s,r)=>s+(r.video_views_3s||0),0);
+  const tImp=d.reduce((s,r)=>s+parseInt(r.impressoes||0),0);
+  const tCli=d.reduce((s,r)=>s+parseInt(r.cliques||0),0);
+  const tCon=d.reduce((s,r)=>s+parseInt(r.consultas||0),0);
+  const tCom=d.reduce((s,r)=>s+parseInt(r.compras||0),0);
+  const tV3=d.reduce((s,r)=>s+parseInt(r.video_views_3s||0),0);
   const tCtr=tImp?tCli/tImp*100:0;
   const tCpm=tImp?tCusto/tImp*1000:0;
   const tCPC=tCon?tCusto/tCon:0;
   const tCPCo=tCom?tCusto/tCom:0;
-  const tHook=tImp?d.reduce((s,r)=>s+(r.video_views_3s||0),0)/tImp*100:0;
+  const tHook=tImp?tV3/tImp*100:0;
   html+=`<tr class="row-total">
     <td></td>
     <td style="text-align:left;font-family:'DM Sans',sans-serif">Total (${d.length} criativos)</td>
@@ -693,6 +695,7 @@ function renderCriativosTable(){
     <td>${tCom?fmtBRL(tCPCo):'<span class="null-val">—</span>'}</td>
     <td>${fmtInt(tV3)}</td>
     <td>${tImp?fmtPct(tHook):'<span class="null-val">—</span>'}</td>
+    <td></td>
   </tr>`;
   document.getElementById('cr-body').innerHTML=html;
 }
